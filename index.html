@@ -284,7 +284,7 @@
       </div>
       <p class="muted">答えなくても、読むだけでも大丈夫です。</p>
       <div class="btn-row" style="margin-top:1em">
-        <button class="btn-primary" id="to-release">つづける</button>
+        <button class="btn-primary" id="reframe-next">つづける</button>
       </div>
     </div>
 
@@ -305,6 +305,23 @@
         <div class="mark">○</div>
         <p class="lead">見逃しても、大丈夫。<br>手放せました。</p>
       </div>
+      <button class="btn-primary" data-go="screen-note">つづける</button>
+    </div>
+
+    <!-- 3A-keep 「はい」= 大切なこと（FOMOではない） -->
+    <div id="work-keep" hidden>
+      <h1>それは、大切なことかもしれません</h1>
+      <p class="concern-echo" id="concern-echo-keep"></p>
+      <p class="lead" style="margin-top:1.4em">考えても残るなら、それは見逃すことへの不安ではなく、<br>あなたが本当に大切にしていることです。</p>
+      <p class="lead">焦って飛びつくのではなく、いつ・どうするかを落ち着いて選べます。今すぐでなくても大丈夫。</p>
+      <button class="btn-primary" data-go="screen-note">つづける</button>
+    </div>
+
+    <!-- 3A-hold 「わからない」/未回答 = 保留 -->
+    <div id="work-hold" hidden>
+      <h1>今は、決めなくて大丈夫</h1>
+      <p class="concern-echo" id="concern-echo-hold"></p>
+      <p class="lead" style="margin-top:1.4em">はっきりしないときは、そのままにしておいていい。<br>保留も、ちゃんとした選択です。</p>
       <button class="btn-primary" data-go="screen-note">つづける</button>
     </div>
   </section>
@@ -454,6 +471,8 @@
   var workReframe = document.getElementById("work-reframe");
   var workRelease = document.getElementById("work-release");
   var workReleased = document.getElementById("work-released");
+  var workKeep = document.getElementById("work-keep");
+  var workHold = document.getElementById("work-hold");
   var concernInput = document.getElementById("concern-input");
 
   function resetWork() {
@@ -461,6 +480,8 @@
     workReframe.hidden = true;
     workRelease.hidden = true;
     workReleased.hidden = true;
+    workKeep.hidden = true;
+    workHold.hidden = true;
     concernInput.value = "";
     document.querySelectorAll(".reframe-answers button").forEach(function (b) {
       b.classList.remove("selected");
@@ -470,7 +491,7 @@
   }
 
   function workStep(stepEl) {
-    [workWrite, workReframe, workRelease, workReleased].forEach(function (s) { s.hidden = true; });
+    [workWrite, workReframe, workRelease, workReleased, workKeep, workHold].forEach(function (s) { s.hidden = true; });
     stepEl.hidden = false;
     var h = stepEl.querySelector("h1");
     if (h) { h.setAttribute("tabindex", "-1"); h.focus(); }
@@ -494,11 +515,27 @@
     });
   });
 
-  document.getElementById("to-release").addEventListener("click", function () {
-    var echo = document.getElementById("concern-echo-release");
-    echo.textContent = session.concern ? "「" + session.concern + "」" : "（その落ち着かなさ）";
-    echo.classList.remove("released");
-    workStep(workRelease);
+  function concernLabel(fallback) {
+    return session.concern ? "「" + session.concern + "」" : fallback;
+  }
+
+  // 問い返しの答えで分岐：「捨てる」を全員に強いない
+  document.getElementById("reframe-next").addEventListener("click", function () {
+    if (session.reframe === "はい") {
+      // 考え抜いても残る = FOMOではなく本当に大切なこと。手放さない。
+      document.getElementById("concern-echo-keep").textContent = concernLabel("（その気がかり）");
+      workStep(workKeep);
+    } else if (session.reframe === "いいえ") {
+      // 恐怖に引っ張られていた = FOMO。手放す儀式へ。
+      var echo = document.getElementById("concern-echo-release");
+      echo.textContent = concernLabel("（その落ち着かなさ）");
+      echo.classList.remove("released");
+      workStep(workRelease);
+    } else {
+      // 「わからない」または未回答 = 保留。決めなくてよい。
+      document.getElementById("concern-echo-hold").textContent = concernLabel("（その気がかり）");
+      workStep(workHold);
+    }
   });
 
   document.getElementById("release-btn").addEventListener("click", function () {
