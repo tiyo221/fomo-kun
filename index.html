@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light dark">
+<title>fomo-kun</title>
+<style>
+  :root {
+    /* 静かで瞑想的なトーン。落ち着いた配色・余白多め */
+    --bg: #f4f1ec;
+    --bg-soft: #faf8f4;
+    --ink: #3a3a38;
+    --ink-soft: #6b6862;
+    --ink-faint: #9b978f;
+    --accent: #7c8c7a;        /* くすんだ緑 */
+    --accent-ink: #ffffff;
+    --line: #e3ded5;
+    --danger: #a86a6a;
+    --radius: 16px;
+    --maxw: 540px;
+    --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1d1b;
+      --bg-soft: #252622;
+      --ink: #e6e3dc;
+      --ink-soft: #b3afa6;
+      --ink-faint: #807c74;
+      --accent: #8ba089;
+      --accent-ink: #15170f;
+      --line: #34352f;
+      --danger: #c98c8c;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN",
+                 "Hiragino Sans", "Yu Gothic", Meiryo, system-ui, sans-serif;
+    line-height: 1.85;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 20px;
+  }
+
+  main {
+    width: 100%;
+    max-width: var(--maxw);
+  }
+
+  /* 画面切り替え：穏やかで短いフェード（注意を奪わない） */
+  .screen {
+    display: none;
+    animation: fadeIn 0.5s var(--ease);
+  }
+  .screen.active { display: block; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .screen { animation: none; }
+    * { transition: none !important; }
+  }
+
+  h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    margin: 0 0 0.4em;
+  }
+  .lead {
+    font-size: 1.05rem;
+    color: var(--ink-soft);
+    margin: 0 0 2em;
+  }
+  p { margin: 0 0 1.2em; }
+  .muted { color: var(--ink-faint); font-size: 0.92rem; }
+
+  .stack { display: flex; flex-direction: column; gap: 14px; }
+
+  /* ボタン */
+  button {
+    font: inherit;
+    cursor: pointer;
+    border: 1px solid var(--line);
+    background: var(--bg-soft);
+    color: var(--ink);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    text-align: left;
+    transition: background 0.25s var(--ease), border-color 0.25s var(--ease), transform 0.1s var(--ease);
+    width: 100%;
+  }
+  button:hover { border-color: var(--accent); }
+  button:active { transform: scale(0.99); }
+  button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: var(--accent-ink);
+    border-color: var(--accent);
+    text-align: center;
+    font-weight: 600;
+  }
+  .btn-primary:hover { filter: brightness(1.05); }
+
+  .btn-ghost {
+    background: transparent;
+    border-color: transparent;
+    color: var(--ink-soft);
+    text-align: center;
+    padding: 12px;
+  }
+  .btn-ghost:hover { color: var(--ink); border-color: transparent; }
+
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .btn-row button { width: auto; flex: 1; min-width: 120px; }
+
+  .choice {
+    display: block;
+  }
+  .choice .label { font-weight: 600; display: block; margin-bottom: 2px; }
+  .choice .desc { color: var(--ink-soft); font-size: 0.95rem; }
+
+  /* テキスト入力 */
+  textarea, input[type="text"] {
+    font: inherit;
+    width: 100%;
+    border: 1px solid var(--line);
+    background: var(--bg-soft);
+    color: var(--ink);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    resize: none;
+    line-height: 1.7;
+  }
+  textarea:focus, input:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+    border-color: var(--accent);
+  }
+
+  /* 手放し演出：書き出した内容が静かにフェードアウト */
+  .concern-echo {
+    background: var(--bg-soft);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    color: var(--ink-soft);
+    font-style: italic;
+    transition: opacity 1.4s var(--ease), transform 1.4s var(--ease), filter 1.4s var(--ease);
+  }
+  .concern-echo.released {
+    opacity: 0;
+    transform: translateY(-10px);
+    filter: blur(3px);
+  }
+
+  /* 認知再構成の応答ボタン群 */
+  .reframe-answers { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 1.4em; }
+  .reframe-answers button { flex: 1; min-width: 90px; text-align: center; }
+  .reframe-answers button.selected {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--accent-ink);
+  }
+
+  /* 振り返りログ */
+  .log-list { list-style: none; padding: 0; margin: 0 0 1.5em; }
+  .log-item {
+    border: 1px solid var(--line);
+    background: var(--bg-soft);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 12px;
+  }
+  .log-meta {
+    font-size: 0.82rem;
+    color: var(--ink-faint);
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+    margin-bottom: 4px;
+  }
+  .tag {
+    display: inline-block;
+    font-size: 0.74rem;
+    padding: 1px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    color: var(--ink-soft);
+  }
+  .log-concern { margin: 0 0 4px; }
+  .log-note { margin: 0; color: var(--ink-soft); }
+  .log-empty { color: var(--ink-faint); text-align: center; padding: 2em 0; }
+
+  .footnote { margin-top: 2.5em; }
+  hr.soft { border: none; border-top: 1px solid var(--line); margin: 1.5em 0; }
+
+  .breath { margin-bottom: 1.6em; }
+
+  /* 締め画面 */
+  .closing { text-align: center; padding: 1em 0; }
+  .closing .mark {
+    font-size: 2rem;
+    color: var(--accent);
+    margin-bottom: 0.3em;
+  }
+</style>
+</head>
+<body>
+<main>
+
+  <!-- [1] 入口画面 -->
+  <section id="screen-home" class="screen active" aria-labelledby="home-title">
+    <h1 id="home-title">fomo-kun</h1>
+    <p class="lead">少し、落ち着かない気持ちがありますか。<br>ここで、その気持ちにそっと目を向けてみましょう。</p>
+    <div class="stack">
+      <button class="btn-primary" data-go="screen-aware">はじめる</button>
+      <button class="btn-ghost" data-go="screen-log">振り返りを見る</button>
+    </div>
+    <p class="muted footnote">記録はこの端末の中だけに保存されます。いつでも消せます。</p>
+  </section>
+
+  <!-- [2] 自覚ステップ（A/B切り分け） -->
+  <section id="screen-aware" class="screen" aria-labelledby="aware-title">
+    <h1 id="aware-title">今のソワソワは、どちらに近い？</h1>
+    <p class="lead">どちらでも大丈夫。選ぶだけで、少し見えてきます。</p>
+    <div class="stack">
+      <button class="choice" data-type="A">
+        <span class="label">具体的に何かを見逃している気がする</span>
+        <span class="desc">気になっている出来事や情報がある</span>
+      </button>
+      <button class="choice" data-type="B">
+        <span class="label">理由はないけど、何となく落ち着かない</span>
+        <span class="desc">これといった対象は思い当たらない</span>
+      </button>
+    </div>
+    <button class="btn-ghost" data-go="screen-home" style="margin-top:1.5em">もどる</button>
+  </section>
+
+  <!-- [3A] FOMOワーク -->
+  <section id="screen-work" class="screen" aria-labelledby="work-title">
+    <!-- 3A-1 書き出し -->
+    <div id="work-write">
+      <h1 id="work-title">何が気になっている？</h1>
+      <p class="lead">一行だけ、書き出してみましょう。書かずに進んでも構いません。</p>
+      <label for="concern-input" class="muted">気になっていること（任意）</label>
+      <textarea id="concern-input" rows="3" placeholder="例：見ていないうちに大事な話が進んでいないか…"></textarea>
+      <div class="btn-row" style="margin-top:14px">
+        <button class="btn-primary" id="to-reframe">つづける</button>
+      </div>
+    </div>
+
+    <!-- 3A-2 認知再構成の問い返し -->
+    <div id="work-reframe" hidden>
+      <h1>少し、問いかけてみます</h1>
+      <p class="concern-echo" id="concern-echo"></p>
+      <p class="lead" style="margin-top:1.4em">それは1週間後も、同じくらい重要だと思いますか？</p>
+      <div class="reframe-answers" role="group" aria-label="問いへの応答（任意）">
+        <button data-reframe="はい">はい</button>
+        <button data-reframe="いいえ">いいえ</button>
+        <button data-reframe="わからない">わからない</button>
+      </div>
+      <p class="muted">答えなくても、読むだけでも大丈夫です。</p>
+      <div class="btn-row" style="margin-top:1em">
+        <button class="btn-primary" id="to-release">つづける</button>
+      </div>
+    </div>
+
+    <!-- 3A-3 手放す儀式 -->
+    <div id="work-release" hidden>
+      <h1>手放してみましょう</h1>
+      <p class="concern-echo" id="concern-echo-release"></p>
+      <p class="lead" style="margin-top:1.4em">見逃しても、きっと大丈夫。<br>下のボタンで、そっと手放してみます。</p>
+      <div class="stack">
+        <button class="btn-primary" id="release-btn">見逃してOK</button>
+        <button class="btn-ghost" data-go="screen-note" id="skip-release">そのまま進む</button>
+      </div>
+    </div>
+
+    <!-- 3A-3 手放し後 -->
+    <div id="work-released" hidden>
+      <div class="closing">
+        <div class="mark">○</div>
+        <p class="lead">見逃しても、大丈夫。<br>手放せました。</p>
+      </div>
+      <button class="btn-primary" data-go="screen-note">つづける</button>
+    </div>
+  </section>
+
+  <!-- [3B] 切り分け結果 -->
+  <section id="screen-notfomo" class="screen" aria-labelledby="notfomo-title">
+    <h1 id="notfomo-title">これは、FOMOではないかもしれません</h1>
+    <p class="lead">はっきりした対象がないなら、その落ち着かなさは
+      見逃しへの不安ではなく、疲れや漠然とした不安かもしれません。</p>
+    <p>少し休んだり、深く呼吸したり。<br>情報を追うことでは、たぶん収まらないものです。</p>
+    <button class="btn-primary" data-go="screen-note">つづける</button>
+  </section>
+
+  <!-- [4] 一言記録 -->
+  <section id="screen-note" class="screen" aria-labelledby="note-title">
+    <h1 id="note-title">今の気持ちを、一言だけ</h1>
+    <p class="lead">残したいことがあれば。なければ、このまま進めます。</p>
+    <label for="note-input" class="muted">一言（任意）</label>
+    <input type="text" id="note-input" placeholder="例：少し落ち着いた">
+    <div class="btn-row" style="margin-top:14px">
+      <button class="btn-primary" id="save-note">記録して終わる</button>
+      <button class="btn-ghost" id="skip-note">記録せずに終わる</button>
+    </div>
+  </section>
+
+  <!-- [5] 締め画面 -->
+  <section id="screen-end" class="screen" aria-labelledby="end-title">
+    <div class="closing">
+      <div class="mark">⌣</div>
+      <h1 id="end-title">おつかれさまでした</h1>
+      <p class="lead">ここまでで、おしまいです。<br>また落ち着かないとき、いつでもどうぞ。</p>
+    </div>
+    <div class="stack">
+      <button class="btn-ghost" data-go="screen-home">最初にもどる</button>
+    </div>
+  </section>
+
+  <!-- [*] 振り返り -->
+  <section id="screen-log" class="screen" aria-labelledby="log-title">
+    <h1 id="log-title">振り返り</h1>
+    <p class="muted" id="log-storage-note"></p>
+    <ul class="log-list" id="log-list"></ul>
+    <hr class="soft">
+    <div class="stack">
+      <button class="btn-ghost" data-go="screen-home">もどる</button>
+      <button class="btn-ghost" id="clear-logs" style="color:var(--danger)">記録をすべて消す</button>
+    </div>
+  </section>
+
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  var STORAGE_KEY = "fomo-kun:logs";
+
+  // --- localStorage ラッパー（使えない環境でもクラッシュさせない） ---
+  var storage = {
+    available: (function () {
+      try {
+        var k = "__fomo_test__";
+        window.localStorage.setItem(k, "1");
+        window.localStorage.removeItem(k);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    })(),
+    load: function () {
+      if (!this.available) return [];
+      try {
+        var raw = window.localStorage.getItem(STORAGE_KEY);
+        if (!raw) return [];
+        var parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (e) {
+        return []; // 壊れていたら安全に空配列へフォールバック
+      }
+    },
+    save: function (logs) {
+      if (!this.available) return false;
+      try {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(logs));
+        return true;
+      } catch (e) {
+        return false;
+      }
+    },
+    clear: function () {
+      if (!this.available) return false;
+      try {
+        window.localStorage.removeItem(STORAGE_KEY);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+  };
+
+  // --- セッション状態 ---
+  var session = newSession();
+  function newSession() {
+    return { type: null, concern: null, reframe: null, note: null };
+  }
+
+  // --- 画面遷移 ---
+  function show(id) {
+    var screens = document.querySelectorAll(".screen");
+    for (var i = 0; i < screens.length; i++) screens[i].classList.remove("active");
+    var el = document.getElementById(id);
+    if (el) {
+      el.classList.add("active");
+      // フォーカスを先頭の見出しへ（キーボード/スクリーンリーダー配慮）
+      var h = el.querySelector("h1");
+      if (h) { h.setAttribute("tabindex", "-1"); h.focus({ preventScroll: false }); }
+      window.scrollTo(0, 0);
+    }
+  }
+
+  // data-go によるシンプルな遷移
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("[data-go]");
+    if (t) {
+      var dest = t.getAttribute("data-go");
+      if (dest === "screen-home") session = newSession();
+      if (dest === "screen-log") renderLogs();
+      show(dest);
+    }
+  });
+
+  // --- [2] A/B 選択 ---
+  document.querySelectorAll("[data-type]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      session.type = btn.getAttribute("data-type");
+      if (session.type === "A") {
+        resetWork();
+        show("screen-work");
+      } else {
+        show("screen-notfomo");
+      }
+    });
+  });
+
+  // --- [3A] ワーク内のステップ管理 ---
+  var workWrite = document.getElementById("work-write");
+  var workReframe = document.getElementById("work-reframe");
+  var workRelease = document.getElementById("work-release");
+  var workReleased = document.getElementById("work-released");
+  var concernInput = document.getElementById("concern-input");
+
+  function resetWork() {
+    workWrite.hidden = false;
+    workReframe.hidden = true;
+    workRelease.hidden = true;
+    workReleased.hidden = true;
+    concernInput.value = "";
+    document.querySelectorAll(".reframe-answers button").forEach(function (b) {
+      b.classList.remove("selected");
+    });
+    document.getElementById("concern-echo").classList.remove("released");
+    document.getElementById("concern-echo-release").classList.remove("released");
+  }
+
+  function workStep(stepEl) {
+    [workWrite, workReframe, workRelease, workReleased].forEach(function (s) { s.hidden = true; });
+    stepEl.hidden = false;
+    var h = stepEl.querySelector("h1");
+    if (h) { h.setAttribute("tabindex", "-1"); h.focus(); }
+  }
+
+  document.getElementById("to-reframe").addEventListener("click", function () {
+    var v = concernInput.value.trim();
+    session.concern = v.length ? v : null;
+    var echo = document.getElementById("concern-echo");
+    echo.textContent = session.concern ? "「" + session.concern + "」" : "（書き出さずに進みました）";
+    workStep(workReframe);
+  });
+
+  document.querySelectorAll(".reframe-answers button").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      document.querySelectorAll(".reframe-answers button").forEach(function (b) {
+        b.classList.remove("selected");
+      });
+      btn.classList.add("selected");
+      session.reframe = btn.getAttribute("data-reframe");
+    });
+  });
+
+  document.getElementById("to-release").addEventListener("click", function () {
+    var echo = document.getElementById("concern-echo-release");
+    echo.textContent = session.concern ? "「" + session.concern + "」" : "（その落ち着かなさ）";
+    echo.classList.remove("released");
+    workStep(workRelease);
+  });
+
+  document.getElementById("release-btn").addEventListener("click", function () {
+    var echo = document.getElementById("concern-echo-release");
+    echo.classList.add("released"); // 静かにフェードアウト
+    var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    setTimeout(function () { workStep(workReleased); }, reduce ? 0 : 1500);
+  });
+
+  // --- [4] 一言記録 → 保存 ---
+  var noteInput = document.getElementById("note-input");
+
+  function saveSession(withNote) {
+    var v = noteInput.value.trim();
+    session.note = (withNote && v.length) ? v : null;
+    var entry = {
+      id: makeId(),
+      timestamp: new Date().toISOString(),
+      type: session.type || "B",
+      concern: session.concern,
+      note: session.note
+    };
+    var logs = storage.load();
+    logs.push(entry);
+    storage.save(logs); // 失敗してもフローは継続
+    noteInput.value = "";
+    show("screen-end");
+  }
+
+  document.getElementById("save-note").addEventListener("click", function () { saveSession(true); });
+  document.getElementById("skip-note").addEventListener("click", function () { saveSession(false); });
+
+  function makeId() {
+    if (window.crypto && window.crypto.randomUUID) {
+      try { return window.crypto.randomUUID(); } catch (e) {}
+    }
+    return "id-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
+  }
+
+  // --- [*] 振り返り ---
+  function renderLogs() {
+    var list = document.getElementById("log-list");
+    var note = document.getElementById("log-storage-note");
+    list.innerHTML = "";
+
+    if (!storage.available) {
+      note.textContent = "この環境では記録の保存ができないため、過去の記録は表示されません。";
+    } else {
+      note.textContent = "";
+    }
+
+    var logs = storage.load();
+    if (!logs.length) {
+      var li = document.createElement("li");
+      li.className = "log-empty";
+      li.textContent = "まだ記録はありません。";
+      list.appendChild(li);
+      return;
+    }
+
+    // 新しい順
+    logs.slice().reverse().forEach(function (log) {
+      var li = document.createElement("li");
+      li.className = "log-item";
+
+      var meta = document.createElement("div");
+      meta.className = "log-meta";
+      var time = document.createElement("span");
+      time.textContent = formatDate(log.timestamp);
+      var tag = document.createElement("span");
+      tag.className = "tag";
+      tag.textContent = log.type === "A" ? "見逃しが気になる" : "理由のない落ち着かなさ";
+      meta.appendChild(time);
+      meta.appendChild(tag);
+      li.appendChild(meta);
+
+      if (log.concern) {
+        var c = document.createElement("p");
+        c.className = "log-concern";
+        c.textContent = log.concern;
+        li.appendChild(c);
+      }
+      if (log.note) {
+        var n = document.createElement("p");
+        n.className = "log-note";
+        n.textContent = "― " + log.note;
+        li.appendChild(n);
+      }
+      list.appendChild(li);
+    });
+  }
+
+  function formatDate(iso) {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return "";
+    var pad = function (n) { return n < 10 ? "0" + n : "" + n; };
+    return d.getFullYear() + "/" + pad(d.getMonth() + 1) + "/" + pad(d.getDate()) +
+           " " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+  }
+
+  document.getElementById("clear-logs").addEventListener("click", function () {
+    if (window.confirm("これまでの記録をすべて消します。よろしいですか？")) {
+      storage.clear();
+      renderLogs();
+    }
+  });
+
+})();
+</script>
+</body>
+</html>
