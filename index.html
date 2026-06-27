@@ -548,9 +548,10 @@
   // --- [4] 一言記録 → 保存 ---
   var noteInput = document.getElementById("note-input");
 
-  function saveSession(withNote) {
+  // 記録して終わる：セッションを保存する
+  function saveSession() {
     var v = noteInput.value.trim();
-    session.note = (withNote && v.length) ? v : null;
+    session.note = v.length ? v : null;
     var entry = {
       id: makeId(),
       timestamp: new Date().toISOString(),
@@ -561,12 +562,17 @@
     var logs = storage.load();
     logs.push(entry);
     storage.save(logs); // 失敗してもフローは継続
+    endSession();
+  }
+
+  // 記録せずに終わる：何も残さず締めへ向かう
+  function endSession() {
     noteInput.value = "";
     show("screen-end");
   }
 
-  document.getElementById("save-note").addEventListener("click", function () { saveSession(true); });
-  document.getElementById("skip-note").addEventListener("click", function () { saveSession(false); });
+  document.getElementById("save-note").addEventListener("click", saveSession);
+  document.getElementById("skip-note").addEventListener("click", endSession);
 
   function makeId() {
     if (window.crypto && window.crypto.randomUUID) {
