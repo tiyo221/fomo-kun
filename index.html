@@ -642,6 +642,9 @@
     releaseActions.hidden = true;
     releaseLead.hidden = true;
     breathGuide.hidden = false;
+    // 非表示にしたボタンからフォーカスが外れるため、呼吸ガイドへ移す
+    breathGuide.setAttribute("tabindex", "-1");
+    breathGuide.focus({ preventScroll: true });
     startBreath();
   });
 
