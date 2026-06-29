@@ -37,6 +37,9 @@
 
   * { box-sizing: border-box; }
 
+  /* hidden 属性は常に優先する（display を指定した要素でも確実に隠す） */
+  [hidden] { display: none !important; }
+
   html, body {
     margin: 0;
     padding: 0;
@@ -219,6 +222,38 @@
 
   .breath { margin-bottom: 1.6em; }
 
+  /* 手放しの呼吸ガイド：穏やかに拡縮する円 */
+  #breath-guide { text-align: center; }
+  .breath-circle-wrap {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 200px;
+    margin: 0.6em 0 0.2em;
+  }
+  .breath-circle {
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
+    background: var(--accent);
+    opacity: 0.45;
+    transform: scale(0.62);
+    /* transition-duration は JS が呼吸フェーズごとに設定する */
+    transition: transform 4s var(--ease), opacity 4s var(--ease);
+  }
+  .breath-circle.inhale {
+    transform: scale(1.25);
+    opacity: 0.85;
+  }
+  .breath-phase {
+    color: var(--ink-soft);
+    letter-spacing: 0.12em;
+    margin: 0 0 1em;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .breath-circle { transition: none !important; }
+  }
+
   /* 締め画面 */
   .closing { text-align: center; padding: 1em 0; }
   .closing .mark {
@@ -292,10 +327,19 @@
     <div id="work-release" hidden>
       <h1>手放してみましょう</h1>
       <p class="concern-echo" id="concern-echo-release"></p>
-      <p class="lead" style="margin-top:1.4em">見逃しても、きっと大丈夫。<br>下のボタンで、そっと手放してみます。</p>
-      <div class="stack">
+      <p class="lead" id="release-lead" style="margin-top:1.4em">見逃しても、きっと大丈夫。<br>下のボタンで、そっと手放してみます。</p>
+      <div class="stack" id="release-actions">
         <button class="btn-primary" id="release-btn">見逃してOK</button>
         <button class="btn-ghost" data-go="screen-note" id="skip-release">そのまま進む</button>
+      </div>
+      <!-- 呼吸ガイド：「見逃してOK」と同時に1呼吸 -->
+      <div id="breath-guide" hidden>
+        <p class="lead" style="margin-top:1.2em">息に合わせて、そっと手放します。</p>
+        <div class="breath-circle-wrap" aria-hidden="true">
+          <div class="breath-circle" id="breath-circle"></div>
+        </div>
+        <p class="lead breath-phase" id="breath-phase" aria-live="polite"></p>
+        <button class="btn-ghost" id="breath-skip">スキップ</button>
       </div>
     </div>
 
@@ -475,6 +519,31 @@
   var workHold = document.getElementById("work-hold");
   var concernInput = document.getElementById("concern-input");
 
+  // 呼吸ガイド関連の要素
+  var breathGuide = document.getElementById("breath-guide");
+  var breathCircle = document.getElementById("breath-circle");
+  var breathPhase = document.getElementById("breath-phase");
+  var releaseActions = document.getElementById("release-actions");
+  var releaseLead = document.getElementById("release-lead");
+  var breathTimers = [];
+
+  function clearBreathTimers() {
+    for (var i = 0; i < breathTimers.length; i++) clearTimeout(breathTimers[i]);
+    breathTimers = [];
+  }
+
+  // 手放し画面を初期状態（ボタン表示・呼吸ガイド非表示）へ戻す
+  function resetReleaseUI() {
+    clearBreathTimers();
+    releaseActions.hidden = false;
+    releaseLead.hidden = false;
+    breathGuide.hidden = true;
+    breathPhase.textContent = "";
+    breathCircle.classList.remove("inhale");
+    breathCircle.style.transitionDuration = "";
+    document.getElementById("concern-echo-release").classList.remove("released");
+  }
+
   function resetWork() {
     workWrite.hidden = false;
     workReframe.hidden = true;
@@ -487,7 +556,7 @@
       b.classList.remove("selected");
     });
     document.getElementById("concern-echo").classList.remove("released");
-    document.getElementById("concern-echo-release").classList.remove("released");
+    resetReleaseUI();
   }
 
   function workStep(stepEl) {
@@ -527,9 +596,8 @@
       workStep(workKeep);
     } else if (session.reframe === "いいえ") {
       // 恐怖に引っ張られていた = FOMO。手放す儀式へ。
-      var echo = document.getElementById("concern-echo-release");
-      echo.textContent = concernLabel("（その落ち着かなさ）");
-      echo.classList.remove("released");
+      resetReleaseUI();
+      document.getElementById("concern-echo-release").textContent = concernLabel("（その落ち着かなさ）");
       workStep(workRelease);
     } else {
       // 「わからない」または未回答 = 保留。決めなくてよい。
@@ -538,12 +606,46 @@
     }
   });
 
+  // 手放し完了（呼吸の有無にかかわらずここへ集約）
+  function finishRelease() {
+    clearBreathTimers();
+    workStep(workReleased);
+  }
+
+  // 1呼吸の呼吸ガイドを再生する（吸う4秒・吐く6秒）
+  function startBreath() {
+    clearBreathTimers();
+    var INHALE = 4000, EXHALE = 6000;
+    breathPhase.textContent = "吸って…";
+    breathCircle.style.transitionDuration = (INHALE / 1000) + "s";
+    // クラス付与前にリフローを挟み、確実にトランジションを発火させる
+    void breathCircle.offsetWidth;
+    breathCircle.classList.add("inhale");
+    breathTimers.push(setTimeout(function () {
+      breathPhase.textContent = "吐いて…";
+      breathCircle.style.transitionDuration = (EXHALE / 1000) + "s";
+      breathCircle.classList.remove("inhale");
+    }, INHALE));
+    breathTimers.push(setTimeout(finishRelease, INHALE + EXHALE));
+  }
+
   document.getElementById("release-btn").addEventListener("click", function () {
     var echo = document.getElementById("concern-echo-release");
     echo.classList.add("released"); // 静かにフェードアウト
     var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    setTimeout(function () { workStep(workReleased); }, reduce ? 0 : 1500);
+    if (reduce) {
+      // モーションを抑える設定では、呼吸演出を出さず従来どおり速やかに進む
+      finishRelease();
+      return;
+    }
+    // 気がかりのフェードアウトと同期して呼吸ガイドを再生
+    releaseActions.hidden = true;
+    releaseLead.hidden = true;
+    breathGuide.hidden = false;
+    startBreath();
   });
+
+  document.getElementById("breath-skip").addEventListener("click", finishRelease);
 
   // --- [4] 一言記録 → 保存 ---
   var noteInput = document.getElementById("note-input");
